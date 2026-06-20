@@ -32,6 +32,7 @@ import com.example.data.NfcCardEntity
 import com.example.viewmodel.PaymentUiState
 import com.example.viewmodel.Receipt
 import com.example.viewmodel.ShopViewModel
+import com.example.ui.theme.LocalAppThemeProperties
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,6 +43,7 @@ fun NfcPaymentSheet(
     viewModel: ShopViewModel,
     modifier: Modifier = Modifier
 ) {
+    val themeProps = LocalAppThemeProperties.current
     val cards by viewModel.cards.collectAsState()
     val paymentState by viewModel.paymentState.collectAsState()
     val totalCost by viewModel.cartTotal.collectAsState()
@@ -52,7 +54,7 @@ fun NfcPaymentSheet(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
+            .padding(themeProps.containerPadding)
     ) {
         // Upper Title / Bar
         Row(
@@ -64,6 +66,7 @@ fun NfcPaymentSheet(
                 Text(
                     text = "NFC PAYMENT TERMINAL",
                     style = MaterialTheme.typography.titleMedium,
+                    fontFamily = themeProps.headerFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.5.sp
@@ -71,6 +74,7 @@ fun NfcPaymentSheet(
                 Text(
                     text = "Tap physical NFC key card or simulate default tag",
                     style = MaterialTheme.typography.bodySmall,
+                    fontFamily = themeProps.bodyFontFamily,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
@@ -170,6 +174,7 @@ fun NfcTerminalTapActive(
     totalCost: Double,
     paymentState: PaymentUiState
 ) {
+    val themeProps = LocalAppThemeProperties.current
     var selectedSimCardUid by remember { mutableStateOf("BF:28:92:76") }
     val cards by viewModel.cards.collectAsState()
 
@@ -177,10 +182,16 @@ fun NfcTerminalTapActive(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
+        shape = themeProps.cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = themeProps.cardElevation),
         modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()
-            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .then(
+                if (themeProps.borderWidth > 0.dp) {
+                    Modifier.border(themeProps.borderWidth, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), themeProps.cardShape)
+                } else Modifier
+            )
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -189,6 +200,7 @@ fun NfcTerminalTapActive(
             Text(
                 text = "NFC TERMINAL ACTIVE",
                 style = MaterialTheme.typography.labelMedium,
+                fontFamily = themeProps.headerFontFamily,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.secondary,
                 letterSpacing = 1.sp
@@ -363,6 +375,7 @@ fun NfcCreditCardItem(
     isDefault: Boolean,
     onReloadClick: (Double) -> Unit
 ) {
+    val themeProps = LocalAppThemeProperties.current
     // Elegant luxury metallic look gradient
     val cardGradient = if (isDefault) {
         Brush.linearGradient(
@@ -383,14 +396,19 @@ fun NfcCreditCardItem(
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = themeProps.cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = themeProps.cardElevation),
         modifier = Modifier
             .fillMaxWidth()
             .height(190.dp)
-            .border(
-                width = 1.dp,
-                color = if (isDefault) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(16.dp)
+            .then(
+                if (themeProps.borderWidth > 0.dp) {
+                    Modifier.border(
+                        width = themeProps.borderWidth,
+                        color = if (isDefault) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.15f),
+                        shape = themeProps.cardShape
+                    )
+                } else Modifier
             )
             .testTag("nfc_card_${card.uid}")
     ) {
@@ -410,6 +428,7 @@ fun NfcCreditCardItem(
                     Text(
                         text = "DEBIT PREPAID",
                         fontSize = 11.sp,
+                        fontFamily = themeProps.bodyFontFamily,
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = 0.6f),
                         letterSpacing = 1.sp
@@ -417,6 +436,7 @@ fun NfcCreditCardItem(
                     Text(
                         text = card.cardholderName.uppercase(),
                         fontWeight = FontWeight.Black,
+                        fontFamily = themeProps.headerFontFamily,
                         fontSize = 16.sp,
                         color = Color.White,
                         letterSpacing = 1.sp

@@ -313,6 +313,77 @@ class ShopViewModel(private val repository: ShopRepository) : ViewModel() {
     fun finishPaymentSession() {
         _paymentState.value = PaymentUiState.Idle
     }
+
+    // --- SETTINGS STATES ---
+    private val _currentTheme = MutableStateFlow(com.example.ui.theme.AppTheme.CYBERPUNK_DARK)
+    val currentTheme: StateFlow<com.example.ui.theme.AppTheme> = _currentTheme.asStateFlow()
+
+    private val _isDarkTheme = MutableStateFlow(true)
+    val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
+
+    private val _isBeepEnabled = MutableStateFlow(true)
+    val isBeepEnabled: StateFlow<Boolean> = _isBeepEnabled.asStateFlow()
+
+    private val _isFrontCamera = MutableStateFlow(false)
+    val isFrontCamera: StateFlow<Boolean> = _isFrontCamera.asStateFlow()
+
+    private val _isCameraEnabled = MutableStateFlow(true)
+    val isCameraEnabled: StateFlow<Boolean> = _isCameraEnabled.asStateFlow()
+
+    private val _isScanTabVisible = MutableStateFlow(true)
+    val isScanTabVisible: StateFlow<Boolean> = _isScanTabVisible.asStateFlow()
+
+    private val _isCheckoutTabVisible = MutableStateFlow(true)
+    val isCheckoutTabVisible: StateFlow<Boolean> = _isCheckoutTabVisible.asStateFlow()
+
+    private val _isNfcTabVisible = MutableStateFlow(true)
+    val isNfcTabVisible: StateFlow<Boolean> = _isNfcTabVisible.asStateFlow()
+
+    private val _isInventoryTabVisible = MutableStateFlow(true)
+    val isInventoryTabVisible: StateFlow<Boolean> = _isInventoryTabVisible.asStateFlow()
+
+    fun updateTheme(theme: com.example.ui.theme.AppTheme) {
+        _currentTheme.value = theme
+    }
+
+    fun updateDarkTheme(enabled: Boolean) {
+        _isDarkTheme.value = enabled
+    }
+
+    fun updateBeepEnabled(enabled: Boolean) {
+        _isBeepEnabled.value = enabled
+    }
+
+    fun updateFrontCamera(enabled: Boolean) {
+        _isFrontCamera.value = enabled
+    }
+
+    fun updateCameraEnabled(enabled: Boolean) {
+        _isCameraEnabled.value = enabled
+    }
+
+    fun updateTabVisibility(tab: String, visible: Boolean) {
+        viewModelScope.launch {
+            val activeCount = listOf(
+                _isScanTabVisible.value,
+                _isCheckoutTabVisible.value,
+                _isNfcTabVisible.value,
+                _isInventoryTabVisible.value
+            ).count { it }
+
+            if (!visible && activeCount <= 1) {
+                _showToast.value = "At least one navigation tab must remain active!"
+                return@launch
+            }
+
+            when (tab) {
+                "SCAN" -> _isScanTabVisible.value = visible
+                "CHECKOUT" -> _isCheckoutTabVisible.value = visible
+                "NFC" -> _isNfcTabVisible.value = visible
+                "INVENTORY" -> _isInventoryTabVisible.value = visible
+            }
+        }
+    }
 }
 
 class ShopViewModelFactory(private val repository: ShopRepository) : ViewModelProvider.Factory {

@@ -28,6 +28,7 @@ import com.example.data.ProductEntity
 import com.example.viewmodel.CartItem
 import com.example.viewmodel.PaymentUiState
 import com.example.viewmodel.ShopViewModel
+import com.example.ui.theme.LocalAppThemeProperties
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -36,6 +37,7 @@ fun CheckoutCartSheet(
     modifier: Modifier = Modifier,
     onNavigateToScan: () -> Unit
 ) {
+    val themeProps = LocalAppThemeProperties.current
     val cartItems by viewModel.cart.collectAsState()
     val subtotal by viewModel.cartSubtotal.collectAsState()
     val tax by viewModel.cartTax.collectAsState()
@@ -46,7 +48,7 @@ fun CheckoutCartSheet(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
+            .padding(themeProps.containerPadding)
     ) {
         // Ticket Header
         Row(
@@ -58,6 +60,7 @@ fun CheckoutCartSheet(
                 Text(
                     text = "CHECKOUT RECEIPT",
                     style = MaterialTheme.typography.titleMedium,
+                    fontFamily = themeProps.headerFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.5.sp
@@ -65,6 +68,7 @@ fun CheckoutCartSheet(
                 Text(
                     text = "Confirm items in cart and process payment",
                     style = MaterialTheme.typography.bodySmall,
+                    fontFamily = themeProps.bodyFontFamily,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
@@ -133,14 +137,20 @@ fun CartItemRow(
     onQtyChange: (Int) -> Unit,
     onRemove: () -> Unit
 ) {
+    val themeProps = LocalAppThemeProperties.current
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        shape = RoundedCornerShape(12.dp),
+        shape = themeProps.cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = themeProps.cardElevation / 2),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .then(
+                if (themeProps.borderWidth > 0.dp) {
+                    Modifier.border(themeProps.borderWidth, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f), themeProps.cardShape)
+                } else Modifier
+            )
             .testTag("cart_item_${cartItem.product.barcode}")
     ) {
         Row(
@@ -155,7 +165,7 @@ fun CartItemRow(
                     .size(40.dp)
                     .background(
                         color = getCategoryColor(cartItem.product.category).copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = themeProps.buttonShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -175,7 +185,8 @@ fun CartItemRow(
             ) {
                 Text(
                     text = cartItem.product.name,
-                    fontWeight = FontWeight.Bold,
+                    fontFamily = themeProps.headerFontFamily,
+                    fontWeight = themeProps.labelWeight,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -183,6 +194,7 @@ fun CartItemRow(
                 Text(
                     text = "$${String.format("%.2f", cartItem.product.price)} each • Barcode: ${cartItem.product.barcode}",
                     style = MaterialTheme.typography.bodySmall,
+                    fontFamily = themeProps.bodyFontFamily,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
@@ -208,6 +220,7 @@ fun CartItemRow(
                 Text(
                     text = "${cartItem.quantity}",
                     fontWeight = FontWeight.Bold,
+                    fontFamily = themeProps.headerFontFamily,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .widthIn(min = 20.dp)
@@ -252,6 +265,7 @@ fun CartItemRow(
 fun EmptyCartState(
     onScanClick: () -> Unit
 ) {
+    val themeProps = LocalAppThemeProperties.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -268,6 +282,7 @@ fun EmptyCartState(
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "YOUR CART IS EMPTY",
+            fontFamily = themeProps.headerFontFamily,
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
@@ -277,12 +292,14 @@ fun EmptyCartState(
         Text(
             text = "Use the Barcode Scanner tab to read codes or select simulation pad elements.",
             style = MaterialTheme.typography.bodySmall,
+            fontFamily = themeProps.bodyFontFamily,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(24.dp))
         Button(
             onClick = onScanClick,
+            shape = themeProps.buttonShape,
             modifier = Modifier.testTag("empty_cart_scan_btn")
         ) {
             Icon(
@@ -290,7 +307,11 @@ fun EmptyCartState(
                 contentDescription = "Scan"
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Go to Scanner")
+            Text(
+                "Go to Scanner",
+                fontFamily = themeProps.headerFontFamily,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -302,13 +323,20 @@ fun BillingSummaryCard(
     total: Double,
     onProceedToPayment: () -> Unit
 ) {
+    val themeProps = LocalAppThemeProperties.current
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
+        shape = themeProps.cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = themeProps.cardElevation),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .then(
+                if (themeProps.borderWidth > 0.dp) {
+                    Modifier.border(themeProps.borderWidth, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), themeProps.cardShape)
+                } else Modifier
+            )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -321,11 +349,13 @@ fun BillingSummaryCard(
                 Text(
                     text = "Subtotal",
                     style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = themeProps.bodyFontFamily,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
                 Text(
                     text = "$${String.format("%.2f", subtotal)}",
                     fontWeight = FontWeight.Medium,
+                    fontFamily = themeProps.headerFontFamily,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -337,11 +367,13 @@ fun BillingSummaryCard(
                 Text(
                     text = "Sales Tax (8.0%)",
                     style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = themeProps.bodyFontFamily,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
                 Text(
                     text = "$${String.format("%.2f", tax)}",
                     fontWeight = FontWeight.Medium,
+                    fontFamily = themeProps.headerFontFamily,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -357,12 +389,14 @@ fun BillingSummaryCard(
                 Text(
                     text = "Grand Total",
                     fontWeight = FontWeight.Bold,
+                    fontFamily = themeProps.headerFontFamily,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = "$${String.format("%.2f", total)}",
                     fontWeight = FontWeight.Bold,
+                    fontFamily = themeProps.headerFontFamily,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.testTag("checkout_grand_total")
@@ -378,7 +412,7 @@ fun BillingSummaryCard(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = themeProps.buttonShape,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
@@ -392,6 +426,7 @@ fun BillingSummaryCard(
                 Text(
                     text = "TAP TO DEBIT (NFC PAY)",
                     fontWeight = FontWeight.Bold,
+                    fontFamily = themeProps.headerFontFamily,
                     fontSize = 15.sp,
                     letterSpacing = 1.sp
                 )

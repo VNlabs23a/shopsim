@@ -10,8 +10,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,6 +52,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.data.ProductEntity
 import com.example.viewmodel.ShopViewModel
+import com.example.ui.theme.LocalAppThemeProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,10 +61,15 @@ fun BarcodeScannerSheet(
     modifier: Modifier = Modifier,
     onNavigateToInventory: (String) -> Unit // if barcode not found, direct them to register it!
 ) {
+    val themeProps = LocalAppThemeProperties.current
     val context = LocalContext.current
     val products by viewModel.products.collectAsState()
     val scannedProduct by viewModel.scannedProductResult.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
+
+    val isBeepEnabled by viewModel.isBeepEnabled.collectAsState()
+    val isFrontCamera by viewModel.isFrontCamera.collectAsState()
+    val isCameraEnabled by viewModel.isCameraEnabled.collectAsState()
 
     var customBarcode by remember { mutableStateOf("") }
     
@@ -79,17 +88,28 @@ fun BarcodeScannerSheet(
 
     // Play a scanning beep音
     val playBeep = {
-        try {
-            val toneG = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-            toneG.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (isBeepEnabled) {
+            try {
+                val toneG = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+                toneG.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     LaunchedEffect(scannedProduct) {
         if (scannedProduct != null) {
             playBeep()
+            kotlinx.coroutines.delay(1800L) // Show the success card for 1.8 seconds then auto dismiss
+            viewModel.dismissScannedResult()
+        }
+    }
+
+    LaunchedEffect(scanError) {
+        if (scanError != null) {
+            kotlinx.coroutines.delay(3000L) // Show error details for 3 seconds then auto dismiss
+            viewModel.dismissScanError()
         }
     }
 
@@ -97,7 +117,7 @@ fun BarcodeScannerSheet(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp),
+            .padding(themeProps.containerPadding),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Upper Title / Bar
@@ -110,6 +130,7 @@ fun BarcodeScannerSheet(
                 Text(
                     text = "BARCODE SCANNER",
                     style = MaterialTheme.typography.titleMedium,
+                    fontFamily = themeProps.headerFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.5.sp
@@ -117,6 +138,7 @@ fun BarcodeScannerSheet(
                 Text(
                     text = "Scan products or enter codes to add to ticket",
                     style = MaterialTheme.typography.bodySmall,
+                    fontFamily = themeProps.bodyFontFamily,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
@@ -140,9 +162,41 @@ fun BarcodeScannerSheet(
                 .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            if (hasCameraPermission) {
+            if (!isCameraEnabled) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "Virtual Simulator",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "VIRTUAL EMULATOR MODE",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Live camera feed is turned off. Use simulator cards or type barcodes manually.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            } else if (hasCameraPermission) {
                 CameraPreviewView(
-                    modifier = Modifier.fillMaxSize()
+                    isFrontCamera = isFrontCamera,
+                    modifier = Modifier.fillMaxSize(),
+                    onBarcodeScanned = { barcode ->
+                        if (scannedProduct == null && scanError == null) {
+                            viewModel.addToCartByBarcode(barcode)
+                        }
+                    }
                 )
                 
                 // Red Laser Sweep Animation
@@ -538,10 +592,28 @@ fun BarcodeVisualRepresentation() {
 }
 
 @Composable
-fun CameraPreviewView(modifier: Modifier = Modifier) {
+fun CameraPreviewView(
+    isFrontCamera: Boolean,
+    modifier: Modifier = Modifier,
+    onBarcodeScanned: (String) -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var resolvedCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    var lastScannedBarcode by remember { mutableStateOf("") }
+    var lastScannedTime by remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(lifecycleOwner) {
+        onDispose {
+            try {
+                resolvedCameraProvider?.unbindAll()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     AndroidView(
         factory = { ctx ->
@@ -552,16 +624,69 @@ fun CameraPreviewView(modifier: Modifier = Modifier) {
             cameraProviderFuture.addListener({
                 try {
                     val cameraProvider = cameraProviderFuture.get()
+                    resolvedCameraProvider = cameraProvider
+                    
                     val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                    val analysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                    val barcodeScanner = com.google.mlkit.vision.barcode.BarcodeScanning.getClient()
+                    analysis.setAnalyzer(executor) { imageProxy ->
+                        val mediaImage = imageProxy.image
+                        if (mediaImage != null) {
+                            val image = com.google.mlkit.vision.common.InputImage.fromMediaImage(
+                                mediaImage,
+                                imageProxy.imageInfo.rotationDegrees
+                            )
+                            barcodeScanner.process(image)
+                                .addOnSuccessListener { barcodes ->
+                                    for (barcode in barcodes) {
+                                        val rawValue = barcode.rawValue ?: barcode.displayValue
+                                        if (rawValue != null) {
+                                            val currentTime = System.currentTimeMillis()
+                                            if (rawValue != lastScannedBarcode || currentTime - lastScannedTime > 2000L) {
+                                                lastScannedBarcode = rawValue
+                                                lastScannedTime = currentTime
+                                                onBarcodeScanned(rawValue)
+                                            }
+                                        }
+                                    }
+                                }
+                                .addOnFailureListener {
+                                    it.printStackTrace()
+                                }
+                                .addOnCompleteListener {
+                                    imageProxy.close()
+                                }
+                        } else {
+                            imageProxy.close()
+                        }
+                    }
+
+                    val cameraSelector = if (isFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview
-                    )
+                    
+                    if (cameraProvider.hasCamera(cameraSelector)) {
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            analysis
+                        )
+                    } else {
+                        val fallbackSelector = if (isFrontCamera) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
+                        if (cameraProvider.hasCamera(fallbackSelector)) {
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                fallbackSelector,
+                                preview,
+                                analysis
+                            )
+                        }
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
