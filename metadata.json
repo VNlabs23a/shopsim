@@ -1,0 +1,6 @@
+{
+  "name": "Shop Simulator",
+  "description": "A shop simulator with a interactive barcode scanner, inventory manager, checkout system, and NFC tag payment simulation.",
+  "requestFramePermissions": ["CAMERA"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
